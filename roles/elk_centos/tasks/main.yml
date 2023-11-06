@@ -1,0 +1,119 @@
+---
+
+- name: Downloading the Source File of Elasticsearch
+  tags: es_ubuntu
+  get_url:
+    url: https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-8.4.3-x86_64.rpm
+    dest: /tmp/elasticsearch-8.4.3-x86_64.rpm
+
+- name: Installing the Elasticsearch
+  tags: es_ubuntu
+  yum:
+    name: /tmp/elasticsearch-8.4.3-x86_64.rpm
+    state: present
+
+- name: Enabling the Elasticsearch Service
+  tags: es_ubuntu
+  service:
+    name: elasticsearch
+    enabled: yes
+
+- name: Modifying service file
+  tags: es_ubuntu
+  replace:
+    path: /usr/lib/systemd/system/elasticsearch.service
+    regexp: "TimeoutStartSec=75"
+    replace: "TimeoutStartSec=300"
+
+- name: Opening Port for Elasticsearch
+  tags: es_ubuntu
+  shell: | 
+    sudo firewall-cmd --permanent --zone=public --add-port=9200/tcp
+    sleep 10
+    sudo firewall-cmd --reload
+
+- name: Enabling Elasticsearch Service
+  tags: es_ubuntu
+  shell: |
+    systemctl enable elasticsearch.service
+    sleep 10
+    systemctl start elasticsearch.service
+  ignore_errors: yes
+
+- name: Downloading and installing public signing key
+  tags: logstash_ubuntu
+  rpm_key:
+    state: present
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch 
+
+- name: Creeating a Repo File for Logstash
+  tags: logstash_ubuntu
+  copy:
+    src: logstash.repo
+    dest: /etc/yum.repos.d/logstash.repo
+    owner: root
+    group: root
+    mode: 0777
+
+- name: Updating Repo
+  tags: logstash_ubuntu
+  dnf:
+    update_cache: yes
+    
+- name: Installing Logstash and its Dependencies
+  tags: logstash_ubuntu
+  dnf:
+    name:
+      - logstash
+    state: latest
+
+- name: Opening Port for Logstash
+  tags: logstash_ubuntul, elk_install
+  shell: | 
+    sudo firewall-cmd --permanent --zone=public --add-port=9600/tcp
+    sleep 10
+    sudo firewall-cmd --reload
+
+- name: Logstash is Started and Enabled
+  tags: logstash_ubuntu, service, logstash_service, elk_service
+  service:
+    name: logstash
+    state: restarted
+    enabled: true
+
+- name: Downloading and Installing Public Signing Key
+  tags: kibana_ubuntu, kibana_install, elk_install
+  rpm_key:
+    state: present
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+
+- name: Adding Kibana to the RPM repository
+  tags: kibana_ubuntu, kibana_install, elk_install
+  copy:
+    src: kibana.repo
+    dest: /etc/yum.repos.d/kibana.repo
+    owner: root
+    group: root
+    mode: 777
+
+- name: Updating the Repository
+  tags: kibana_ubuntu, kibana_install, elk_install
+  yum:
+    name:
+      - kibana
+    state: latest
+
+- name: Opening port for Kibana
+  tags: kibana_ubuntu, kibana_installl, elk_install
+  firewalld:
+    port: 5601/tcp
+    zone: public
+    permanent: yes
+    state: enabled
+
+- name: Kibana is Started and Enabled
+  tags: kibana_ubuntu, elk_service, kibana_service, service  
+  service:
+    name: kibana
+    state: restarted
+    enabled: true
